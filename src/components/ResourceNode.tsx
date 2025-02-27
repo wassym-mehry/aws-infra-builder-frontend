@@ -1,32 +1,28 @@
+// src/components/ResourceNode.tsx
 import React from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, NodeProps, Node } from '@xyflow/react';
 import { Box, IconButton, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useDispatch } from 'react-redux';
 import { removeNode } from '../redux/slices/architectureSlice';
-import { VpcConfig, Ec2Config, S3BucketConfig } from '../types';
+import { NodeData } from '../types';
 
-interface NodeData {
-  type: string;
-  data: VpcConfig | Ec2Config | S3BucketConfig;
+interface ResourceNodeProps extends NodeProps<Node<NodeData>> {
+  // Correctly extend NodeProps with Node<NodeData>
 }
 
-interface ResourceNodeProps {
-  data: NodeData;
-}
-
-const ResourceNode: React.FC<ResourceNodeProps> = ({ data }) => {
+const ResourceNode: React.FC<ResourceNodeProps> = ({ data, id }) => {
   const dispatch = useDispatch();
-  const { type, data: resourceData } = data;
+  const type = data.type; // Access type from NodeData
 
-  const handleDelete = () => {
-    dispatch(removeNode(type + '-' + data));
+  const handleDelete = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent React Flow from intercepting the click
+    dispatch(removeNode(id));
   };
 
   return (
     <Box sx={{ p: 2, bgcolor: 'white', border: '1px solid #ccc', borderRadius: 1 }}>
       <Typography variant="h6">{type}</Typography>
-      <Typography>{JSON.stringify(resourceData).substring(0, 50)}</Typography>
       <IconButton onClick={handleDelete} aria-label="delete" size="small">
         <DeleteIcon />
       </IconButton>

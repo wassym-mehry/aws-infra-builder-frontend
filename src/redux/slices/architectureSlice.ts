@@ -1,3 +1,4 @@
+// src/redux/slices/architectureSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Node, Edge } from '@xyflow/react';
 import { NodeData, VpcConfig, Ec2Config, S3BucketConfig } from '../../types';
@@ -41,7 +42,7 @@ const architectureSlice = createSlice({
         id: `${type}-${Date.now()}`,
         type: 'resource',
         position: { x: Math.random() * 500, y: Math.random() * 500 },
-        data: { type, data }, // Removed incorrect index signature
+        data: { type, data },
       };
       state.nodes.push(node);
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
@@ -59,7 +60,8 @@ const generateTerraformCode = (nodes: Node<NodeData>[], edges: Edge[]): string =
       return; // Safeguard against invalid node data
     }
 
-    const { type, data } = nodeData;
+    const type = nodeData.type;
+    const data = nodeData.data;
 
     if (type === 'vpc') {
       const vpcData = data as VpcConfig;

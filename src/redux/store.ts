@@ -1,8 +1,18 @@
+// src/redux/store.ts
 import { configureStore } from '@reduxjs/toolkit';
 import architectureReducer from './slices/architectureSlice';
 import uiReducer from './slices/uiSlice';
-import { Node, Edge } from '@xyflow/react';
+import { Edge } from '@xyflow/react';
 import { NodeData } from '../types';
+
+type CustomNode = {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: NodeData;
+  draggable?: boolean;
+  [key: string]: any;
+};
 
 export const store = configureStore({
   reducer: {
@@ -13,7 +23,7 @@ export const store = configureStore({
 
 export type RootState = {
   architecture: {
-    nodes: Node<NodeData>[];
+    nodes: CustomNode[];
     edges: Edge[];
     terraformCode: string;
   };
