@@ -29,7 +29,6 @@ const architectureSlice = createSlice({
     addNode: (state, action: PayloadAction<Node<NodeData>>) => {
       state.nodes.push(action.payload);
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
-      // Deep copy nodes and edges for history
       state.history = state.history.slice(0, state.historyIndex + 1);
       state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
       state.historyIndex += 1;
@@ -38,7 +37,6 @@ const architectureSlice = createSlice({
       state.nodes = state.nodes.filter(node => node.id !== action.payload);
       state.edges = state.edges.filter(edge => edge.source !== action.payload && edge.target !== action.payload);
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
-      // Deep copy nodes and edges for history
       state.history = state.history.slice(0, state.historyIndex + 1);
       state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
       state.historyIndex += 1;
@@ -46,7 +44,6 @@ const architectureSlice = createSlice({
     updateNodes: (state, action: PayloadAction<Node<NodeData>[]>) => {
       state.nodes = action.payload;
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
-      // Deep copy nodes and edges for history
       state.history = state.history.slice(0, state.historyIndex + 1);
       state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
       state.historyIndex += 1;
@@ -54,7 +51,6 @@ const architectureSlice = createSlice({
     updateEdges: (state, action: PayloadAction<Edge[]>) => {
       state.edges = action.payload;
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
-      // Deep copy nodes and edges for history
       state.history = state.history.slice(0, state.historyIndex + 1);
       state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
       state.historyIndex += 1;
@@ -69,7 +65,6 @@ const architectureSlice = createSlice({
       };
       state.nodes.push(node);
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
-      // Deep copy nodes and edges for history
       state.history = state.history.slice(0, state.historyIndex + 1);
       state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
       state.historyIndex += 1;
@@ -91,6 +86,13 @@ const architectureSlice = createSlice({
         state.edges = deepCopy(nextState.edges);
         state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
       }
+    },
+    updateTerraformCode: (state, action: PayloadAction<string>) => {
+      state.terraformCode = action.payload;
+      // Optionally, you can add the updated code to the history if needed
+      state.history = state.history.slice(0, state.historyIndex + 1);
+      state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
+      state.historyIndex += 1;
     },
   },
 });
@@ -151,5 +153,5 @@ const generateTerraformCode = (nodes: Node<NodeData>[], edges: Edge[]): string =
   return code;
 };
 
-export const { addNode, removeNode, updateNodes, updateEdges, addResource, undo, redo } = architectureSlice.actions;
+export const { addNode, removeNode, updateNodes, updateEdges, addResource, undo, redo, updateTerraformCode } = architectureSlice.actions;
 export default architectureSlice.reducer;
