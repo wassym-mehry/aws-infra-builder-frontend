@@ -21,6 +21,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addNode, updateNodes, updateEdges, undo, redo } from '../redux/slices/architectureSlice';
 import { RootState, NodeData, VpcConfig, Ec2Config, S3BucketConfig } from '../redux/store';
 import { Box, Typography } from '@mui/material';
+import { deepEqual } from '../utils/deepEqual';
 
 const nodeTypes = {
   resource: ResourceNode,
@@ -29,8 +30,14 @@ const nodeTypes = {
 // Inner component that uses useReactFlow
 const FlowCanvasInner: React.FC = () => {
   const dispatch = useDispatch();
-  const nodes = useSelector((state: RootState) => state.architecture.nodes);
-  const edges = useSelector((state: RootState) => state.architecture.edges);
+  const nodes = useSelector(
+    (state: RootState) => state.architecture.nodes,
+    (prev, next) => deepEqual(prev, next) // Deep comparison for nodes
+  );
+  const edges = useSelector(
+    (state: RootState) => state.architecture.edges,
+    (prev, next) => deepEqual(prev, next) // Deep comparison for edges
+  );
   const historyIndex = useSelector((state: RootState) => state.architecture.historyIndex);
   const historyLength = useSelector((state: RootState) => state.architecture.history.length);
   const [rfNodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>(nodes);
@@ -56,7 +63,7 @@ const FlowCanvasInner: React.FC = () => {
       setReactFlowNodes(nodes);
       console.log('Syncing rfEdges with Redux edges:', edges);
       setReactFlowEdges(edges);
-    }, 0); // Defer to next tick to avoid rendering conflicts
+    }, 0);
     return () => clearTimeout(timer);
   }, [nodes, edges, setReactFlowNodes, setReactFlowEdges]);
 
