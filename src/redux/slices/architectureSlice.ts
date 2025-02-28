@@ -7,13 +7,20 @@ interface ArchitectureState {
   nodes: Node<NodeData>[];
   edges: Edge[];
   terraformCode: string;
+  history: { nodes: Node<NodeData>[]; edges: Edge[] }[];
+  historyIndex: number;
 }
 
 const initialState: ArchitectureState = {
   nodes: [],
   edges: [],
   terraformCode: '',
+  history: [{ nodes: [], edges: [] }],
+  historyIndex: 0,
 };
+
+// Utility function for deep copying
+const deepCopy = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
 
 const architectureSlice = createSlice({
   name: 'architecture',
@@ -22,19 +29,35 @@ const architectureSlice = createSlice({
     addNode: (state, action: PayloadAction<Node<NodeData>>) => {
       state.nodes.push(action.payload);
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
+      // Deep copy nodes and edges for history
+      state.history = state.history.slice(0, state.historyIndex + 1);
+      state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
+      state.historyIndex += 1;
     },
     removeNode: (state, action: PayloadAction<string>) => {
       state.nodes = state.nodes.filter(node => node.id !== action.payload);
       state.edges = state.edges.filter(edge => edge.source !== action.payload && edge.target !== action.payload);
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
+      // Deep copy nodes and edges for history
+      state.history = state.history.slice(0, state.historyIndex + 1);
+      state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
+      state.historyIndex += 1;
     },
     updateNodes: (state, action: PayloadAction<Node<NodeData>[]>) => {
       state.nodes = action.payload;
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
+      // Deep copy nodes and edges for history
+      state.history = state.history.slice(0, state.historyIndex + 1);
+      state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
+      state.historyIndex += 1;
     },
     updateEdges: (state, action: PayloadAction<Edge[]>) => {
       state.edges = action.payload;
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
+      // Deep copy nodes and edges for history
+      state.history = state.history.slice(0, state.historyIndex + 1);
+      state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
+      state.historyIndex += 1;
     },
     addResource: (state, action: PayloadAction<{ type: string; data: VpcConfig | Ec2Config | S3BucketConfig }>) => {
       const { type, data } = action.payload;
@@ -46,6 +69,28 @@ const architectureSlice = createSlice({
       };
       state.nodes.push(node);
       state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
+      // Deep copy nodes and edges for history
+      state.history = state.history.slice(0, state.historyIndex + 1);
+      state.history.push({ nodes: deepCopy(state.nodes), edges: deepCopy(state.edges) });
+      state.historyIndex += 1;
+    },
+    undo: (state) => {
+      if (state.historyIndex > 0) {
+        state.historyIndex -= 1;
+        const previousState = state.history[state.historyIndex];
+        state.nodes = deepCopy(previousState.nodes);
+        state.edges = deepCopy(previousState.edges);
+        state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
+      }
+    },
+    redo: (state) => {
+      if (state.historyIndex < state.history.length - 1) {
+        state.historyIndex += 1;
+        const nextState = state.history[state.historyIndex];
+        state.nodes = deepCopy(nextState.nodes);
+        state.edges = deepCopy(nextState.edges);
+        state.terraformCode = generateTerraformCode(state.nodes, state.edges as Edge[]);
+      }
     },
   },
 });
@@ -106,5 +151,5 @@ const generateTerraformCode = (nodes: Node<NodeData>[], edges: Edge[]): string =
   return code;
 };
 
-export const { addNode, removeNode, updateNodes, updateEdges, addResource } = architectureSlice.actions;
+export const { addNode, removeNode, updateNodes, updateEdges, addResource, undo, redo } = architectureSlice.actions;
 export default architectureSlice.reducer;

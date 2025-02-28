@@ -1,5 +1,5 @@
 // src/components/FlowCanvas.tsx
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   addEdge,
   NodeChange,
@@ -8,7 +8,6 @@ import {
   useEdgesState,
   ReactFlow,
   ReactFlowProvider,
-  Controls,
   MiniMap,
   Background,
   useReactFlow,
@@ -17,10 +16,11 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import ResourceNode from './ResourceNode';
+import Toolbar from './Toolbar';
 import { useDispatch, useSelector } from 'react-redux';
-import { addNode, updateNodes, updateEdges, removeNode } from '../redux/slices/architectureSlice';
-import { RootState } from '../redux/store';
-import { NodeData , VpcConfig, Ec2Config, S3BucketConfig } from '../types';
+import { addNode, updateNodes, updateEdges, undo, redo } from '../redux/slices/architectureSlice';
+import { RootState, NodeData, VpcConfig, Ec2Config, S3BucketConfig } from '../redux/store';
+import { Box, Typography } from '@mui/material';
 
 const nodeTypes = {
   resource: ResourceNode,
@@ -31,18 +31,44 @@ const FlowCanvasInner: React.FC = () => {
   const dispatch = useDispatch();
   const nodes = useSelector((state: RootState) => state.architecture.nodes);
   const edges = useSelector((state: RootState) => state.architecture.edges);
+  const historyIndex = useSelector((state: RootState) => state.architecture.historyIndex);
+  const historyLength = useSelector((state: RootState) => state.architecture.history.length);
   const [rfNodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>(nodes);
   const [rfEdges, setEdges, onEdgesChange] = useEdgesState(edges);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getViewport, setViewport, setNodes: setReactFlowNodes, setEdges: setReactFlowEdges } = useReactFlow();
+  const [mode, setMode] = useState<'select' | 'move'>('move'); // Default to move mode
 
-  // Sync initial Redux state with React Flow state
-  useEffect(() => {
-    setNodes(nodes);
-  }, [nodes, setNodes]);
+  // Custom zoom in/out
+  const zoomIn = useCallback(() => {
+    const { x, y, zoom } = getViewport();
+    setViewport({ x, y, zoom: zoom + 0.1 });
+  }, [getViewport, setViewport]);
 
+  const zoomOut = useCallback(() => {
+    const { x, y, zoom } = getViewport();
+    setViewport({ x, y, zoom: Math.max(0.1, zoom - 0.1) }); // Prevent zooming out too far
+  }, [getViewport, setViewport]);
+
+  // Sync React Flow state with Redux state after rendering
   useEffect(() => {
-    setEdges(edges);
-  }, [edges, setEdges]);
+    const timer = setTimeout(() => {
+      console.log('Syncing rfNodes with Redux nodes:', nodes);
+      setReactFlowNodes(nodes);
+      console.log('Syncing rfEdges with Redux edges:', edges);
+      setReactFlowEdges(edges);
+    }, 0); // Defer to next tick to avoid rendering conflicts
+    return () => clearTimeout(timer);
+  }, [nodes, edges, setReactFlowNodes, setReactFlowEdges]);
+
+  // Update nodes' draggable property based on mode
+  useEffect(() => {
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => ({
+        ...node,
+        draggable: mode === 'move', // Set draggable based on mode
+      }))
+    );
+  }, [mode, setNodes]);
 
   // Update Redux state when nodes are dragged (onNodesChange)
   const handleNodesChange = useCallback((changes: NodeChange<Node<NodeData>>[]) => {
@@ -65,6 +91,38 @@ const FlowCanvasInner: React.FC = () => {
       return newEdges;
     });
   }, [setEdges, dispatch]);
+
+  // Handle node click for multi-selection in Select Mode
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node<NodeData>) => {
+    console.log('Node clicked:', node.id, 'Mode:', mode);
+    if (mode !== 'select') return;
+
+    // Check if Ctrl key is pressed for multi-selection
+    const isMultiSelect = event.ctrlKey || event.metaKey; // metaKey for Mac Cmd key
+
+    setNodes((currentNodes) => {
+      const updatedNodes = currentNodes.map((n) => {
+        if (n.id === node.id) {
+          // Toggle selection for the clicked node
+          return { ...n, selected: isMultiSelect ? !n.selected : true };
+        }
+        // If not holding Ctrl, deselect all other nodes; otherwise, keep their state
+        return { ...n, selected: isMultiSelect ? n.selected : false };
+      });
+      return updatedNodes;
+    });
+  }, [mode, setNodes]);
+
+  // Handle canvas click to deselect all nodes in Select Mode
+  const onPaneClick = useCallback(() => {
+    if (mode !== 'select') return;
+    setNodes((currentNodes) => {
+      return currentNodes.map((n) => ({ ...n, selected: false }));
+    });
+  }, [mode, setNodes]);
+
+  // Calculate the number of selected nodes
+  const selectedNodesCount = rfNodes.filter((node) => node.selected).length;
 
   // Handle drag over to allow dropping
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -121,16 +179,39 @@ const FlowCanvasInner: React.FC = () => {
         type: 'resource',
         position,
         data: { type: resourceType, data },
-        draggable: true,
+        draggable: mode === 'move', // Set draggable based on mode
+        selected: false, // Initialize as not selected
       };
 
       dispatch(addNode(newNode));
     },
-    [screenToFlowPosition, dispatch]
+    [screenToFlowPosition, dispatch, mode]
   );
 
+  // Handle Undo
+  const handleUndo = useCallback(() => {
+    console.log('Handling undo');
+    dispatch(undo());
+  }, [dispatch]);
+
+  // Handle Redo
+  const handleRedo = useCallback(() => {
+    console.log('Handling redo');
+    dispatch(redo());
+  }, [dispatch]);
+
   return (
-    <div style={{ height: '100vh', width: '50%' }} onDragOver={onDragOver} onDrop={onDrop}>
+    <div style={{ height: '100vh', width: '50%', position: 'relative' }} onDragOver={onDragOver} onDrop={onDrop}>
+      <Toolbar
+        mode={mode}
+        setMode={setMode}
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
+        undo={handleUndo}
+        redo={handleRedo}
+        canUndo={historyIndex > 0}
+        canRedo={historyIndex < historyLength - 1}
+      />
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -138,13 +219,34 @@ const FlowCanvasInner: React.FC = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
+        nodesDraggable={mode === 'move'} // Enable dragging in move mode
+        nodesConnectable={mode === 'select'} // Enable connecting in select mode
+        nodesFocusable={false} // Disable React Flow's default selection
+        className={mode === 'select' ? 'select-mode' : 'move-mode'} // Add class for cursor styling
       >
-        <Controls />
         <MiniMap />
         <Background />
       </ReactFlow>
+      {mode === 'select' && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 10,
+            left: 10,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            zIndex: 1000,
+          }}
+        >
+          <Typography variant="body2">Selected nodes: {selectedNodesCount}</Typography>
+        </Box>
+      )}
     </div>
   );
 };

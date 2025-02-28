@@ -12,3 +12,19 @@ body {
   #root {
     height: 100vh;
   }
+
+
+  /* src/styles/global.css (or src/styles/react-flow.css) */
+.select-mode .react-flow__node {
+  cursor: pointer !important; /* Pointer cursor in Select Mode */
+}
+
+.move-mode .react-flow__node {
+  cursor: grab !important; /* Hand cursor in Move Mode */
+}
+
+.react-flow__node.selected {
+  border: 2px solid #1976d2;
+  background-color: #e3f2fd;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
